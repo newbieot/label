@@ -49,3 +49,8 @@ File PDF tidak menambahkan margin halaman. Kemampuan mencetak sampai tepi fisik 
 
 ## Footer
 Footer bergaya konsisten dengan lacak.posnew.com. Tautan **PosNew Hub** mengarah ke https://posnew.com/.
+
+## Version 5 – English footer
+
+- Footer text and accessibility labels are now in English.
+- **PosNew Hub** continues to link directly to `https://posnew.com/`.
