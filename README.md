@@ -45,3 +45,7 @@ Canonical, Open Graph, `robots.txt`, dan `sitemap.xml` menggunakan:
 ## Catatan pencetakan
 
 File PDF tidak menambahkan margin halaman. Kemampuan mencetak sampai tepi fisik kertas bergantung pada dukungan borderless printer.
+
+
+## Footer
+Footer bergaya konsisten dengan lacak.posnew.com. Tautan **PosNew Hub** mengarah ke https://posnew.com/.

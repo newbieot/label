@@ -12,7 +12,8 @@
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; color: var(--ink); background: linear-gradient(180deg, #f8faff 0, #fff 520px); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.55; }
+body { margin: 0; min-width: 320px; min-height: 100vh; display: flex; flex-direction: column; color: var(--ink); background: linear-gradient(180deg, #f8faff 0, #fff 520px); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.55; }
+main { flex: 1 0 auto; }
 button, input, textarea, select { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
 .shell { width: min(1180px, calc(100% - 36px)); margin-inline: auto; }
@@ -128,10 +129,32 @@ button { -webkit-tap-highlight-color: transparent; }
 .faq details:last-child { border-bottom: 1px solid #e0e6ef; }
 .faq summary { padding: 17px 0; color: #263550; font-weight: 800; cursor: pointer; }
 .faq p { margin: -5px 0 18px; color: #667085; }
-.site-footer { border-top: 1px solid #e3e8f0; background: #f8fafc; }
-.footer-inner { display: flex; justify-content: space-between; gap: 30px; padding-block: 27px; color: #667085; font-size: .82rem; }
-.footer-inner strong { color: var(--navy); }
-.footer-inner p { margin: 3px 0 0; }
+.dashboard-footer {
+  width: 100%;
+  min-height: 40px;
+  margin-top: auto;
+  padding: 0 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  overflow: hidden;
+  border-top: 2px solid var(--orange);
+  color: #e2e8f0;
+  background: #0f172a;
+  font-size: .72rem;
+}
+.footer-brand { flex: 0 0 auto; display: inline-flex; align-items: center; gap: .42rem; color: #f8fafc; font-weight: 800; text-decoration: none; white-space: nowrap; transition: color .2s ease, transform .2s ease; }
+.footer-brand svg { width: 15px; fill: none; stroke: var(--orange); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.footer-brand:hover { color: #fff; transform: translateY(-1px); }
+.footer-brand:hover svg { stroke: #ff8a72; }
+.footer-desc { flex: 1; margin: 0; overflow: hidden; color: #94a3b8; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.footer-creator-badge { flex: 0 0 auto; display: inline-flex; align-items: center; gap: .35rem; padding: .22rem .62rem; border: 1px solid rgba(239,75,35,.28); border-radius: 999px; color: #e2e8f0; background: rgba(239,75,35,.09); text-decoration: none; white-space: nowrap; transition: color .25s ease, background .25s ease, border-color .25s ease, transform .25s ease; }
+.footer-creator-badge svg { width: 13px; fill: none; stroke: var(--orange); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform .35s ease; }
+.footer-creator-badge strong { color: var(--orange); }
+.footer-creator-badge:hover { transform: translateY(-1px); color: #fff; border-color: rgba(239,75,35,.72); background: rgba(239,75,35,.22); }
+.footer-creator-badge:hover svg { transform: rotate(12deg) scale(1.13); }
+.footer-creator-badge:hover strong { color: #ff8a72; }
 .toast { position: fixed; z-index: 50; left: 50%; bottom: 24px; max-width: calc(100% - 32px); padding: 12px 16px; border-radius: 12px; color: #fff; background: #19243c; box-shadow: 0 12px 30px rgba(0,0,0,.22); opacity: 0; transform: translate(-50%,18px); pointer-events: none; transition: .2s ease; }
 .toast.show { opacity: 1; transform: translate(-50%,0); }
 @media (max-width: 1040px) {
@@ -161,6 +184,13 @@ button { -webkit-tap-highlight-color: transparent; }
   .preview-footer { padding-inline: 16px; }
   .feature-grid { grid-template-columns: 1fr; }
   .seo-content { padding-block: 62px 52px; }
-  .footer-inner { flex-direction: column; }
+  .footer-desc { display: none; }
+  .dashboard-footer { min-height: 38px; padding: 0 10px; font-size: .65rem; }
+  .footer-creator-badge { padding-inline: .45rem; }
+}
+@media (max-width: 430px) {
+  .footer-brand svg { display: none; }
+  .footer-creator-badge { max-width: 64%; overflow: hidden; }
+  .footer-creator-badge span { overflow: hidden; text-overflow: ellipsis; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; transition: none !important; } }
