@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Generator Label Pengiriman PDF | PosIND KCU Batam 29400</title>
+  <meta name="description" content="Buat 1–4 label pengiriman PosIND KCU Batam dalam satu lembar A4 dan unduh langsung sebagai PDF. Cepat, rapi, hemat kertas, dan tanpa unggah data ke server.">
+  <meta name="keywords" content="generator label pengiriman, label surat PDF, label Pos Indonesia Batam, label A4, PosIND KCU Batam">
+  <meta name="author" content="PosIND KCU Batam 29400">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+  <meta name="theme-color" content="#11275f">
+  <link rel="canonical" href="https://label.posnew.com/">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="id_ID">
+  <meta property="og:site_name" content="Generator Label PosIND KCU Batam">
+  <meta property="og:title" content="Generator Label Pengiriman PDF PosIND KCU Batam">
+  <meta property="og:description" content="Buat 1–4 label pengiriman pada kertas A4 dan unduh langsung sebagai PDF yang rapi serta hemat kertas.">
+  <meta property="og:url" content="https://label.posnew.com/">
+  <meta property="og:image" content="https://label.posnew.com/assets/og-label-posind.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Generator Label Pengiriman PDF PosIND KCU Batam">
+  <meta name="twitter:description" content="Buat label surat A4 yang rapi dan hemat kertas, lalu unduh sebagai PDF.">
+  <meta name="twitter:image" content="https://label.posnew.com/assets/og-label-posind.png">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Generator Label Pengiriman PDF PosIND KCU Batam",
+    "url": "https://label.posnew.com/",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "inLanguage": "id-ID",
+    "description": "Aplikasi web untuk membuat satu sampai empat label pengiriman PosIND KCU Batam pada satu halaman A4 dan mengunduhnya sebagai PDF.",
+    "offers": {"@type": "Offer", "price": "0", "priceCurrency": "IDR"},
+    "featureList": [
+      "Ekspor PDF A4",
+      "Satu sampai empat label per halaman",
+      "Tata letak hemat kertas",
+      "Pemrosesan data di perangkat pengguna"
+    ]
+  }
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#form-label">Lewati ke formulir</a>
+
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="#top" aria-label="Generator Label PosIND KCU Batam">
+        <img src="assets/logo-posind.png" alt="Logo PosIND Logistik Indonesia" width="58" height="50">
+        <span>
+          <strong>Generator Label</strong>
+          <small>KCU Batam 29400</small>
+        </span>
+      </a>
+      <div class="header-note" aria-label="Keunggulan aplikasi">
+        <span class="status-dot" aria-hidden="true"></span>
+        Data diproses di perangkat Anda
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero shell" aria-labelledby="hero-title">
+      <div>
+        <p class="eyebrow">LABEL PENGIRIMAN · PDF A4</p>
+        <h1 id="hero-title">Buat label surat yang rapi, cepat, dan hemat kertas.</h1>
+        <p class="hero-copy">Isi nomor surat, penerima, alamat, dan perihal. Pilih jumlah label yang dibutuhkan, lalu unduh PDF A4 dengan tata letak mepet ke tepi.</p>
+      </div>
+      <div class="hero-badge" aria-label="Format keluaran">
+        <span>A4</span>
+        <strong>PDF siap cetak</strong>
+        <small>1–4 label per halaman</small>
+      </div>
+    </section>
+
+    <section class="app-shell shell" aria-label="Aplikasi pembuat label">
+      <div class="editor-panel" id="form-label">
+        <div class="panel-heading">
+          <div>
+            <p class="step-label">LANGKAH 1</p>
+            <h2>Isi data label</h2>
+          </div>
+          <button class="text-button" id="resetBtn" type="button">Kosongkan</button>
+        </div>
+
+        <fieldset class="count-fieldset">
+          <legend>Jumlah label</legend>
+          <div class="segmented" role="radiogroup" aria-label="Jumlah label pada satu halaman A4">
+            <label><input type="radio" name="labelCount" value="1" checked><span>1</span></label>
+            <label><input type="radio" name="labelCount" value="2"><span>2</span></label>
+            <label><input type="radio" name="labelCount" value="3"><span>3</span></label>
+            <label><input type="radio" name="labelCount" value="4"><span>4</span></label>
+          </div>
+          <p class="field-help">Satu dan dua label ditempatkan di bagian paling atas agar sisa kertas tetap dapat digunakan.</p>
+        </fieldset>
+
+        <div id="labelForms" class="label-forms" aria-live="polite"></div>
+
+        <details class="advanced-settings">
+          <summary>Pengaturan cetak</summary>
+          <div class="setting-row">
+            <div>
+              <label for="edgeMargin">Jarak dari tepi kertas</label>
+              <p>PDF tetap berukuran A4 tanpa margin halaman.</p>
+            </div>
+            <select id="edgeMargin">
+              <option value="1.5" selected>Mepet · 1,5 mm</option>
+              <option value="3">Aman · 3 mm</option>
+              <option value="5">Longgar · 5 mm</option>
+            </select>
+          </div>
+        </details>
+
+        <div class="action-bar">
+          <button class="secondary-button" id="sampleBtn" type="button">
+            <span aria-hidden="true">↺</span> Muat contoh
+          </button>
+          <button class="primary-button" id="downloadBtn" type="button">
+            <span aria-hidden="true">↓</span> Unduh PDF
+          </button>
+        </div>
+        <p class="privacy-note"><span aria-hidden="true">🔒</span> Data tidak dikirim atau disimpan ke server.</p>
+      </div>
+
+      <aside class="preview-panel" aria-labelledby="preview-title">
+        <div class="preview-toolbar">
+          <div>
+            <p class="step-label">LANGKAH 2</p>
+            <h2 id="preview-title">Pratinjau A4</h2>
+          </div>
+          <span class="scale-pill">Skala otomatis</span>
+        </div>
+        <div class="paper-stage">
+          <div class="paper-frame">
+            <canvas id="previewCanvas" width="900" height="1273" aria-label="Pratinjau halaman A4 berisi label pengiriman"></canvas>
+          </div>
+        </div>
+        <div class="preview-footer">
+          <span><i class="legend cut"></i> Garis potong</span>
+          <span><i class="legend safe"></i> Batas label</span>
+        </div>
+      </aside>
+    </section>
+
+    <section class="seo-content shell" aria-labelledby="about-title">
+      <article>
+        <p class="eyebrow">MUDAH DIGUNAKAN</p>
+        <h2 id="about-title">Generator label pengiriman PDF untuk kebutuhan surat dinas</h2>
+        <p>Aplikasi ini membantu membuat label surat PosIND KCU Batam 29400 tanpa mengatur desain secara manual. Hasil akhir berupa satu halaman PDF berukuran A4 dengan label ditempatkan mulai dari bagian atas kertas.</p>
+      </article>
+      <div class="feature-grid">
+        <article>
+          <span class="feature-number">01</span>
+          <h3>Hemat kertas</h3>
+          <p>Jumlah label mengikuti kebutuhan. Satu label tidak akan diulang menjadi empat.</p>
+        </article>
+        <article>
+          <span class="feature-number">02</span>
+          <h3>Ukuran konsisten</h3>
+          <p>PDF dibuat langsung pada kanvas A4 210 × 297 mm dengan jarak tepi yang dapat dipilih.</p>
+        </article>
+        <article>
+          <span class="feature-number">03</span>
+          <h3>Privasi terjaga</h3>
+          <p>Seluruh pemrosesan berlangsung di browser. Data label tidak perlu diunggah.</p>
+        </article>
+      </div>
+
+      <div class="faq" aria-labelledby="faq-title">
+        <h2 id="faq-title">Pertanyaan umum</h2>
+        <details>
+          <summary>Apakah hasilnya langsung berupa PDF?</summary>
+          <p>Ya. Tombol Unduh PDF membuat satu file PDF A4 langsung di browser, tanpa dialog cetak dan tanpa server tambahan.</p>
+        </details>
+        <details>
+          <summary>Bagaimana tata letak untuk empat label?</summary>
+          <p>Empat label disusun dua kolom dan dua baris pada bagian atas halaman. Untuk dua label, keduanya disusun berdampingan dalam satu baris.</p>
+        </details>
+        <details>
+          <summary>Apakah PDF benar-benar borderless?</summary>
+          <p>File PDF tidak memiliki margin halaman. Jarak label dari tepi dapat dibuat 1,5 mm. Kemampuan mencetak sampai tepi fisik kertas tetap bergantung pada printer.</p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-inner">
+      <div>
+        <strong>PosIND KCU Batam 29400</strong>
+        <p>Jalan Ibnu Soetowo No. 2, Batam Center, Kota Batam</p>
+      </div>
+      <p>Alat bantu pembuatan label pengiriman.</p>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "Generator Label Pengiriman PosIND KCU Batam",
+  "short_name": "Label PosIND",
+  "description": "Buat label pengiriman A4 dan unduh sebagai PDF.",
+  "lang": "id-ID",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#11275f",
+  "icons": [
+    {"src": "assets/favicon.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "assets/apple-touch-icon.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}
