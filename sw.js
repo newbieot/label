@@ -1,4 +1,4 @@
-const CACHE = 'label-posind-v2';
+const CACHE = 'label-posind-v3-adaptive';
 const ASSETS = ['/', '/index.html', '/styles.css', '/app.js', '/assets/logo-posind.png', '/assets/favicon.png'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))));

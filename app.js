@@ -2,14 +2,14 @@
   'use strict';
 
   const A4 = { widthMm: 210, heightMm: 297 };
-  const STORAGE_KEY = 'label-posind-kcu-batam-v2';
-  const LEGACY_STORAGE_KEY = 'label-posind-kcu-batam-v1';
+  const STORAGE_KEY = 'label-posind-kcu-batam-v3';
+  const LEGACY_STORAGE_KEY = 'label-posind-kcu-batam-v2';
   const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
   const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
   const SIZE_CONFIG = {
-    compact: { labelHeight: 69, name: 'Ringkas' },
-    standard: { labelHeight: 92, name: 'Standar' },
-    large: { labelHeight: 142, name: 'Besar' }
+    compact: { minHeight: 49, maxHeight: 78, name: 'Ringkas' },
+    standard: { minHeight: 68, maxHeight: 105, name: 'Standar' },
+    large: { minHeight: 102, maxHeight: 155, name: 'Besar' }
   };
   const DEFAULT_LABEL = {
     noSurat: '150/BKL/ENTERPRISE/0726',
@@ -50,6 +50,12 @@
   const logo = new Image();
   logo.src = 'assets/logo-posind.png';
   logo.onload = () => renderPreview();
+
+  const MEASURE_SCALE = 6;
+  const measureCanvas = document.createElement('canvas');
+  measureCanvas.width = 1600;
+  measureCanvas.height = 1200;
+  const measureCtx = measureCanvas.getContext('2d');
 
   function escapeHtml(value) {
     return String(value).replace(/[&<>'"]/g, char => ({
@@ -144,36 +150,150 @@
     updateLayoutSummary();
   }
 
+  function getStyleProfile() {
+    if (state.size === 'large') {
+      return {
+        pad: 4, logoW: 20, logoY: 3, numberBoxW: 39.5, numberBoxH: 12.5, numberY: 3,
+        senderY: 22.2, senderFont: 2.9, senderSubFont: 2.5, senderLineHeight: 3.55,
+        dividerY: 34.5, recipientGapTop: 3.2, recipientGapBottom: 2.7,
+        iconR: 4.6, iconGap: 2.6, headingFont: 3.25, recipientFont: 4.1,
+        recipientMinFont: 2.65, addressFont: 3.25, addressMinFont: 2.15,
+        recipientMaxLines: 4, addressMaxLines: 4,
+        docSize: 7.2, subjectPadTop: 2.5, subjectPadBottom: 2.5,
+        subjectLabelFont: 3.05, subjectFont: 3.05, subjectMinFont: 1.95, subjectMaxLines: 4
+      };
+    }
+    if (state.size === 'standard') {
+      return {
+        pad: 3.5, logoW: 17, logoY: 3, numberBoxW: 39.5, numberBoxH: 12.5, numberY: 3,
+        senderY: 19.2, senderFont: 2.55, senderSubFont: 2.25, senderLineHeight: 3.2,
+        dividerY: 29.8, recipientGapTop: 2.8, recipientGapBottom: 2.35,
+        iconR: 4.05, iconGap: 2.3, headingFont: 2.9, recipientFont: 3.55,
+        recipientMinFont: 2.35, addressFont: 2.85, addressMinFont: 1.95,
+        recipientMaxLines: 4, addressMaxLines: 4,
+        docSize: 6.2, subjectPadTop: 2.2, subjectPadBottom: 2.2,
+        subjectLabelFont: 2.75, subjectFont: 2.7, subjectMinFont: 1.75, subjectMaxLines: 4
+      };
+    }
+    return {
+      pad: 3, logoW: 15, logoY: 2.4, numberBoxW: 37, numberBoxH: 11.5, numberY: 2.3,
+      senderY: 16.2, senderFont: 2.35, senderSubFont: 2.08, senderLineHeight: 2.85,
+      dividerY: 25.3, recipientGapTop: 2.2, recipientGapBottom: 1.9,
+      iconR: 3.45, iconGap: 1.9, headingFont: 2.65, recipientFont: 3.25,
+      recipientMinFont: 2.15, addressFont: 2.65, addressMinFont: 1.85,
+      recipientMaxLines: 4, addressMaxLines: 4,
+      docSize: 5.5, subjectPadTop: 1.85, subjectPadBottom: 1.85,
+      subjectLabelFont: 2.5, subjectFont: 2.45, subjectMinFont: 1.65, subjectMaxLines: 4
+    };
+  }
+
+  function measureFit(text, maxWidthMm, maxLines, startFontMm, minFontMm, fontWeight = 400) {
+    return fitWrappedText(
+      measureCtx,
+      normalizeText(text) || '—',
+      maxWidthMm * MEASURE_SCALE,
+      maxLines,
+      startFontMm * MEASURE_SCALE,
+      minFontMm * MEASURE_SCALE,
+      fontWeight
+    );
+  }
+
+  function computeLabelMetrics(data, widthMm) {
+    const profile = getStyleProfile();
+    const contentWidth = widthMm - profile.pad * 2;
+    const recipientTextWidth = contentWidth - profile.iconR * 2 - profile.iconGap;
+    const recipient = measureFit(data.kepada, recipientTextWidth, profile.recipientMaxLines, profile.recipientFont, profile.recipientMinFont, 820);
+    const address = measureFit(data.alamat, recipientTextWidth, profile.addressMaxLines, profile.addressFont, profile.addressMinFont, 520);
+
+    measureCtx.font = `800 ${profile.subjectLabelFont * MEASURE_SCALE}px Inter, Arial, sans-serif`;
+    const subjectLabelWidthMm = measureCtx.measureText('Perihal:').width / MEASURE_SCALE + .85;
+    const subjectTextWidth = Math.max(20, contentWidth - profile.docSize - 1.4 - subjectLabelWidthMm);
+    const subject = measureFit(data.perihal, subjectTextWidth, profile.subjectMaxLines, profile.subjectFont, profile.subjectMinFont, 520);
+
+    const headingHeight = profile.headingFont * 1.08;
+    const recipientLinesHeight = (recipient.size / MEASURE_SCALE) * 1.12 * recipient.lines.length;
+    const addressLinesHeight = (address.size / MEASURE_SCALE) * 1.14 * address.lines.length;
+    const recipientContentHeight = headingHeight + .7 + recipientLinesHeight + .45 + addressLinesHeight;
+    const recipientSectionHeight = profile.recipientGapTop + Math.max(profile.iconR * 2 + .6, recipientContentHeight) + profile.recipientGapBottom;
+
+    const subjectTextHeight = (subject.size / MEASURE_SCALE) * 1.14 * subject.lines.length;
+    const subjectContentHeight = Math.max(profile.docSize, subjectTextHeight, profile.subjectLabelFont * 1.12);
+    const subjectSectionHeight = profile.subjectPadTop + subjectContentHeight + profile.subjectPadBottom;
+
+    const rawHeight = profile.dividerY + recipientSectionHeight + subjectSectionHeight + 1.0;
+    const config = SIZE_CONFIG[state.size];
+    const height = Math.min(config.maxHeight, Math.max(config.minHeight, Math.ceil(rawHeight * 10) / 10));
+
+    return {
+      profile,
+      height,
+      recipient,
+      address,
+      subject,
+      recipientTextWidth,
+      subjectTextWidth,
+      subjectLabelWidthMm,
+      recipientSectionHeight,
+      subjectSectionHeight,
+      subjectDividerMm: height - subjectSectionHeight - 1.0
+    };
+  }
+
   function getLayoutInfo() {
     const gap = 1.2;
     const margin = state.margin;
-    const height = SIZE_CONFIG[state.size].labelHeight;
     const width = (A4.widthMm - margin * 2 - gap) / 2;
-    const rows = Math.max(1, Math.floor((A4.heightMm - margin * 2 + gap) / (height + gap)));
-    const labelsPerPage = rows * 2;
-    const positions = [];
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < 2; col++) {
-        positions.push({
-          x: margin + col * (width + gap),
-          y: margin + row * (height + gap),
-          w: width,
-          h: height
-        });
+    const pages = [[]];
+    const allItems = [];
+    let pageIndex = 0;
+    let y = margin;
+
+    for (let index = 0; index < state.labels.length; index += 2) {
+      const firstMetrics = computeLabelMetrics(state.labels[index], width);
+      const secondMetrics = index + 1 < state.labels.length ? computeLabelMetrics(state.labels[index + 1], width) : null;
+      const rowHeight = Math.max(firstMetrics.height, secondMetrics?.height || 0);
+
+      if (pages[pageIndex].length && y + rowHeight > A4.heightMm - margin) {
+        pageIndex += 1;
+        pages.push([]);
+        y = margin;
       }
+
+      const first = { index, box: { x: margin, y, w: width, h: firstMetrics.height }, metrics: firstMetrics };
+      pages[pageIndex].push(first);
+      allItems.push({ ...first, pageIndex });
+
+      if (secondMetrics) {
+        const second = { index: index + 1, box: { x: margin + width + gap, y, w: width, h: secondMetrics.height }, metrics: secondMetrics };
+        pages[pageIndex].push(second);
+        allItems.push({ ...second, pageIndex });
+      }
+      y += rowHeight + gap;
     }
-    return { gap, margin, height, width, rows, labelsPerPage, positions };
+
+    return { gap, margin, width, pages, allItems };
+  }
+
+  function findPageForLabel(index) {
+    return getLayoutInfo().allItems.find(item => item.index === index)?.pageIndex || 0;
   }
 
   function getPageCount() {
-    return Math.max(1, Math.ceil(state.labels.length / getLayoutInfo().labelsPerPage));
+    return Math.max(1, getLayoutInfo().pages.length);
   }
 
   function updateLayoutSummary() {
     const layout = getLayoutInfo();
-    const pages = getPageCount();
-    els.layoutSummary.textContent = `${SIZE_CONFIG[state.size].name}: ${layout.width.toFixed(1)} × ${layout.height.toFixed(1)} mm per label · ${layout.labelsPerPage} label per halaman · ${pages} halaman PDF untuk ${state.labels.length} label.`;
-    els.previewScalePill.textContent = `${layout.width.toFixed(1)} × ${layout.height.toFixed(1)} mm`;
+    const heights = layout.allItems.map(item => item.box.h);
+    const minHeight = heights.length ? Math.min(...heights) : SIZE_CONFIG[state.size].minHeight;
+    const maxHeight = heights.length ? Math.max(...heights) : SIZE_CONFIG[state.size].minHeight;
+    const heightText = Math.abs(maxHeight - minHeight) < .05
+      ? `${minHeight.toFixed(1)} mm`
+      : `${minHeight.toFixed(1)}–${maxHeight.toFixed(1)} mm`;
+    const firstPageCount = layout.pages[0]?.length || 0;
+    els.layoutSummary.textContent = `${SIZE_CONFIG[state.size].name}: lebar tetap ${layout.width.toFixed(1)} mm · tinggi adaptif ${heightText} · ${firstPageCount} label di halaman pertama · ${layout.pages.length} halaman PDF.`;
+    els.previewScalePill.textContent = `${layout.width.toFixed(1)} mm · tinggi adaptif`;
   }
 
   function roundRect(ctx, x, y, w, h, r) {
@@ -272,12 +392,12 @@
     ctx.stroke(); ctx.restore();
   }
 
-  function drawLabel(ctx, box, data, scale) {
+  function drawLabel(ctx, box, data, scale, suppliedMetrics = null) {
     const mm = value => value * scale;
     const x = mm(box.x), y = mm(box.y), w = mm(box.w), h = mm(box.h);
-    const compact = box.h <= 70;
-    const large = box.h >= 130;
-    const pad = mm(compact ? 3 : large ? 4 : 3.5);
+    const metrics = suppliedMetrics || computeLabelMetrics(data, box.w);
+    const p = metrics.profile;
+    const pad = mm(p.pad);
     const navy = '#142b63';
     const orange = '#ef4b23';
     const ink = '#101828';
@@ -286,110 +406,137 @@
     const inner = mm(.85);
 
     ctx.save();
-    ctx.fillStyle = '#fff'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x, y, w, h);
 
     ctx.setLineDash([mm(.75), mm(.55)]);
     ctx.lineWidth = mm(.18);
     ctx.strokeStyle = cut;
-    roundRect(ctx, x + mm(.12), y + mm(.12), w - mm(.24), h - mm(.24), mm(2.1)); ctx.stroke();
+    roundRect(ctx, x + mm(.12), y + mm(.12), w - mm(.24), h - mm(.24), mm(2.1));
+    ctx.stroke();
     ctx.setLineDash([]);
 
     ctx.lineWidth = mm(.28);
     ctx.strokeStyle = navy;
-    roundRect(ctx, x + inner, y + inner, w - inner * 2, h - inner * 2, mm(1.8)); ctx.stroke();
+    roundRect(ctx, x + inner, y + inner, w - inner * 2, h - inner * 2, mm(1.8));
+    ctx.stroke();
     drawScissors(ctx, x + w - mm(1.9), y + mm(.35), mm(2.4), '#555d6c');
 
     const contentX = x + pad;
     const contentRight = x + w - pad;
-    const logoW = mm(compact ? 15 : large ? 20 : 17);
+    const logoW = mm(p.logoW);
     const logoH = logoW * (210 / 240);
-    const logoY = y + mm(compact ? 2.4 : 3);
+    const logoY = y + mm(p.logoY);
     if (logo.complete && logo.naturalWidth) ctx.drawImage(logo, contentX, logoY, logoW, logoH);
 
-    const numberBoxW = mm(compact ? 37 : 39.5);
-    const numberBoxH = mm(compact ? 11.5 : 12.5);
+    const numberBoxW = mm(p.numberBoxW);
+    const numberBoxH = mm(p.numberBoxH);
     const numberX = contentRight - numberBoxW;
-    const numberY = y + mm(compact ? 2.3 : 3);
-    ctx.fillStyle = '#f8fafc'; ctx.strokeStyle = navy; ctx.lineWidth = mm(.25);
-    roundRect(ctx, numberX, numberY, numberBoxW, numberBoxH, mm(1.35)); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = navy; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.font = `500 ${mm(compact ? 2.15 : 2.35)}px Inter, Arial, sans-serif`;
+    const numberY = y + mm(p.numberY);
+    ctx.fillStyle = '#f8fafc';
+    ctx.strokeStyle = navy;
+    ctx.lineWidth = mm(.25);
+    roundRect(ctx, numberX, numberY, numberBoxW, numberBoxH, mm(1.35));
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = navy;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = `500 ${mm(state.size === 'compact' ? 2.15 : 2.35)}px Inter, Arial, sans-serif`;
     ctx.fillText('No. Surat:', numberX + mm(1.7), numberY + mm(1.2));
-    const noFit = fitWrappedText(ctx, normalizeText(data.noSurat) || '—', numberBoxW - mm(3.4), 2, mm(compact ? 2.45 : 2.7), mm(1.85), 800);
+    const noFit = fitWrappedText(ctx, normalizeText(data.noSurat) || '—', numberBoxW - mm(3.4), 2, mm(state.size === 'compact' ? 2.45 : 2.7), mm(1.85), 800);
     ctx.font = `800 ${noFit.size}px Inter, Arial, sans-serif`;
     drawLines(ctx, noFit.lines, numberX + mm(1.7), numberY + mm(4.55), noFit.size * 1.06, navy);
 
-    const senderY = y + mm(compact ? 16.2 : large ? 22.2 : 19.2);
+    const senderY = y + mm(p.senderY);
     ctx.fillStyle = ink;
-    ctx.font = `800 ${mm(compact ? 2.25 : large ? 2.8 : 2.5)}px Inter, Arial, sans-serif`;
+    ctx.font = `800 ${mm(p.senderFont)}px Inter, Arial, sans-serif`;
     ctx.fillText('Dari:', contentX, senderY);
     const fromWidth = ctx.measureText('Dari:').width;
-    ctx.font = `500 ${mm(compact ? 2.25 : large ? 2.8 : 2.5)}px Inter, Arial, sans-serif`;
+    ctx.font = `500 ${mm(p.senderFont)}px Inter, Arial, sans-serif`;
     ctx.fillText('KANTOR POS BATAM', contentX + fromWidth + mm(.65), senderY);
     ctx.fillStyle = muted;
-    ctx.font = `500 ${mm(compact ? 1.95 : large ? 2.4 : 2.15)}px Inter, Arial, sans-serif`;
-    const senderLines = ['KCU Batam 29400', 'Jalan Ibnu Soetowo No. 2, Batam Center, Kota Batam'];
-    drawLines(ctx, senderLines, contentX, senderY + mm(compact ? 3.05 : 3.6), mm(compact ? 2.75 : 3.2), muted);
+    ctx.font = `500 ${mm(p.senderSubFont)}px Inter, Arial, sans-serif`;
+    drawLines(
+      ctx,
+      ['KCU Batam 29400', 'Jalan Ibnu Soetowo No. 2, Batam Center, Kota Batam'],
+      contentX,
+      senderY + mm(p.senderFont + .8),
+      mm(p.senderLineHeight),
+      muted
+    );
 
-    const dividerY = y + mm(compact ? 25.3 : large ? 34.5 : 29.8);
-    ctx.strokeStyle = orange; ctx.lineWidth = mm(.48);
-    ctx.beginPath(); ctx.moveTo(contentX, dividerY); ctx.lineTo(contentRight, dividerY); ctx.stroke();
+    const dividerY = y + mm(p.dividerY);
+    ctx.strokeStyle = orange;
+    ctx.lineWidth = mm(.48);
+    ctx.beginPath();
+    ctx.moveTo(contentX, dividerY);
+    ctx.lineTo(contentRight, dividerY);
+    ctx.stroke();
 
-    const recipientTop = dividerY + mm(compact ? 2.5 : 3.1);
-    const iconR = mm(compact ? 3.45 : large ? 4.6 : 4.05);
+    const recipientTop = dividerY + mm(p.recipientGapTop);
+    const iconR = mm(p.iconR);
+    const textX = contentX + iconR * 2 + mm(p.iconGap);
+    const headingHeight = mm(p.headingFont * 1.08);
+    const recipientSizePx = (metrics.recipient.size / MEASURE_SCALE) * scale;
+    const addressSizePx = (metrics.address.size / MEASURE_SCALE) * scale;
+    const recipientTextHeight = headingHeight + mm(.7)
+      + metrics.recipient.lines.length * recipientSizePx * 1.12
+      + mm(.45)
+      + metrics.address.lines.length * addressSizePx * 1.14;
     const iconCx = contentX + iconR;
-    const iconCy = recipientTop + iconR + mm(.3);
+    const iconCy = recipientTop + Math.max(iconR + mm(.3), recipientTextHeight / 2);
     drawPersonIcon(ctx, iconCx, iconCy, iconR, navy);
 
-    const textX = contentX + iconR * 2 + mm(compact ? 1.9 : 2.5);
-    const textMax = contentRight - textX;
-    ctx.font = `800 ${mm(compact ? 2.35 : large ? 3 : 2.7)}px Inter, Arial, sans-serif`;
-    ctx.fillStyle = navy; ctx.fillText('Kepada Yth.', textX, recipientTop);
+    ctx.font = `800 ${mm(p.headingFont)}px Inter, Arial, sans-serif`;
+    ctx.fillStyle = navy;
+    ctx.fillText('Kepada Yth.', textX, recipientTop);
 
-    const recipientMaxLines = large ? 4 : 3;
-    const kepadaFit = fitWrappedText(ctx, normalizeText(data.kepada) || '—', textMax, recipientMaxLines, mm(compact ? 2.85 : large ? 3.8 : 3.3), mm(compact ? 2.05 : 2.45), 820);
-    ctx.font = `820 ${kepadaFit.size}px Inter, Arial, sans-serif`;
-    drawLines(ctx, kepadaFit.lines, textX, recipientTop + mm(compact ? 3.35 : 4.1), kepadaFit.size * 1.12, ink);
-    const kepadaHeight = kepadaFit.lines.length * kepadaFit.size * 1.12;
+    ctx.font = `820 ${recipientSizePx}px Inter, Arial, sans-serif`;
+    const recipientY = recipientTop + headingHeight + mm(.7);
+    drawLines(ctx, metrics.recipient.lines, textX, recipientY, recipientSizePx * 1.12, ink);
 
-    const addressStart = recipientTop + mm(compact ? 3.7 : 4.5) + kepadaHeight;
-    const alamatFit = fitWrappedText(ctx, normalizeText(data.alamat) || '—', textMax, large ? 3 : 2, mm(compact ? 2.15 : 2.55), mm(1.75), 500);
-    ctx.font = `500 ${alamatFit.size}px Inter, Arial, sans-serif`;
-    drawLines(ctx, alamatFit.lines, textX, addressStart, alamatFit.size * 1.13, ink);
+    ctx.font = `520 ${addressSizePx}px Inter, Arial, sans-serif`;
+    const addressY = recipientY + metrics.recipient.lines.length * recipientSizePx * 1.12 + mm(.45);
+    drawLines(ctx, metrics.address.lines, textX, addressY, addressSizePx * 1.14, ink);
 
-    const subjectHeight = compact ? 13.2 : large ? 19 : 15.5;
-    const subjectDividerY = y + h - mm(subjectHeight);
-    ctx.strokeStyle = '#aeb7c5'; ctx.lineWidth = mm(.18); ctx.setLineDash([mm(.65), mm(.5)]);
-    ctx.beginPath(); ctx.moveTo(contentX, subjectDividerY); ctx.lineTo(contentRight, subjectDividerY); ctx.stroke();
+    const subjectDividerY = y + mm(metrics.subjectDividerMm);
+    ctx.strokeStyle = '#aeb7c5';
+    ctx.lineWidth = mm(.18);
+    ctx.setLineDash([mm(.65), mm(.5)]);
+    ctx.beginPath();
+    ctx.moveTo(contentX, subjectDividerY);
+    ctx.lineTo(contentRight, subjectDividerY);
+    ctx.stroke();
     ctx.setLineDash([]);
 
-    const docSize = mm(compact ? 5.5 : large ? 7.2 : 6.2);
+    const docSize = mm(p.docSize);
     const docX = contentX + mm(.45);
-    const docY = subjectDividerY + mm(compact ? 2.25 : 2.7);
+    const subjectContentHeight = mm(metrics.subjectSectionHeight - p.subjectPadTop - p.subjectPadBottom);
+    const docY = subjectDividerY + mm(p.subjectPadTop) + Math.max(0, (subjectContentHeight - docSize) / 2);
     drawDocumentIcon(ctx, docX, docY, docSize, orange);
 
-    const subjectX = docX + docSize + mm(compact ? 1.4 : 1.9);
-    const subjectY = subjectDividerY + mm(compact ? 2.8 : 3.3);
+    const subjectX = docX + docSize + mm(state.size === 'compact' ? 1.4 : 1.9);
+    const subjectY = subjectDividerY + mm(p.subjectPadTop);
     ctx.fillStyle = orange;
-    ctx.font = `800 ${mm(compact ? 2.2 : large ? 2.9 : 2.55)}px Inter, Arial, sans-serif`;
+    ctx.font = `800 ${mm(p.subjectLabelFont)}px Inter, Arial, sans-serif`;
     ctx.fillText('Perihal:', subjectX, subjectY);
-    const labelWidth = ctx.measureText('Perihal:').width + mm(.85);
-    const perihalMax = contentRight - subjectX - labelWidth;
-    const perihalFit = fitWrappedText(ctx, normalizeText(data.perihal) || '—', perihalMax, compact ? 3 : 3, mm(compact ? 1.95 : large ? 2.65 : 2.3), mm(1.55), 500);
-    ctx.font = `500 ${perihalFit.size}px Inter, Arial, sans-serif`;
-    drawLines(ctx, perihalFit.lines, subjectX + labelWidth, subjectY, perihalFit.size * 1.12, ink);
+    const subjectLabelWidth = ctx.measureText('Perihal:').width + mm(.85);
+    const subjectSizePx = (metrics.subject.size / MEASURE_SCALE) * scale;
+    ctx.font = `520 ${subjectSizePx}px Inter, Arial, sans-serif`;
+    drawLines(ctx, metrics.subject.lines, subjectX + subjectLabelWidth, subjectY, subjectSizePx * 1.14, ink);
     ctx.restore();
   }
 
   function renderPage(ctx, widthPx, heightPx, pageIndex = 0) {
     const scale = widthPx / A4.widthMm;
     const layout = getLayoutInfo();
-    const start = pageIndex * layout.labelsPerPage;
-    const labels = state.labels.slice(start, start + layout.labelsPerPage);
+    const items = layout.pages[pageIndex] || [];
     ctx.save();
     ctx.clearRect(0, 0, widthPx, heightPx);
-    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, widthPx, heightPx);
-    labels.forEach((label, index) => drawLabel(ctx, layout.positions[index], label, scale));
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, widthPx, heightPx);
+    items.forEach(item => drawLabel(ctx, item.box, state.labels[item.index], scale, item.metrics));
     ctx.restore();
   }
 
@@ -721,7 +868,7 @@
         if (replaceFirst && index === 0) state.labels[0] = label;
         else state.labels.push(label);
       });
-      state.previewPage = Math.floor((state.labels.length - 1) / getLayoutInfo().labelsPerPage);
+      state.previewPage = findPageForLabel(state.labels.length - 1);
       renderForms(Math.max(0, state.labels.length - 1));
       renderPreview(); saveState();
       const incomplete = parsed.filter(entry => entry.data.missing.length).length;
@@ -738,7 +885,7 @@
   function addLabel(data = EMPTY_LABEL, afterIndex = state.labels.length - 1) {
     const insertAt = Math.min(state.labels.length, Math.max(0, afterIndex + 1));
     state.labels.splice(insertAt, 0, { ...EMPTY_LABEL, ...data });
-    state.previewPage = Math.floor(insertAt / getLayoutInfo().labelsPerPage);
+    state.previewPage = findPageForLabel(insertAt);
     renderForms(insertAt); renderPreview(); saveState();
     requestAnimationFrame(() => els.forms.querySelector(`[data-label-index="${insertAt}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
   }
