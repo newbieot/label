@@ -1,8 +1,8 @@
-const CACHE = 'label-posind-v7-1-excel-hotfix';
+const CACHE = 'label-posind-v7-2-layout-pack';
 const SHELL = [
-  '/index.html?v=7.1',
-  '/styles.css?v=7.1',
-  '/app.js?v=7.1',
+  '/index.html?v=7.2',
+  '/styles.css?v=7.2',
+  '/app.js?v=7.2',
   '/assets/logo-posind.png',
   '/assets/favicon.png'
 ];
@@ -24,8 +24,8 @@ self.addEventListener('activate', event => {
     const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     await Promise.all(clients.map(client => {
       const url = new URL(client.url);
-      if (url.origin !== self.location.origin || url.searchParams.get('appVersion') === '7.1') return Promise.resolve();
-      url.searchParams.set('appVersion', '7.1');
+      if (url.origin !== self.location.origin || url.searchParams.get('appVersion') === '7.2') return Promise.resolve();
+      url.searchParams.set('appVersion', '7.2');
       return client.navigate(url.href).catch(() => undefined);
     }));
   })());
@@ -52,7 +52,7 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin || url.pathname === '/sw.js') return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(networkFirst(request, '/index.html?v=7.1'));
+    event.respondWith(networkFirst(request, '/index.html?v=7.2'));
     return;
   }
 

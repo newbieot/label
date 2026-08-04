@@ -2,8 +2,9 @@
   'use strict';
 
   const A4 = { widthMm: 210, heightMm: 297 };
-  const STORAGE_KEY = 'label-posind-kcu-batam-v3';
-  const LEGACY_STORAGE_KEY = 'label-posind-kcu-batam-v2';
+  const STORAGE_KEY = 'label-posind-kcu-batam-v4';
+  const LEGACY_STORAGE_KEY = 'label-posind-kcu-batam-v3';
+  const FALLBACK_STORAGE_KEY = 'label-posind-kcu-batam-v2';
   const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
   const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
   const SPREADSHEET_EXTENSIONS = ['.xlsx', '.csv'];
@@ -34,6 +35,8 @@
     previewPage: 0,
     labels: [{ ...EMPTY_LABEL }]
   };
+
+  let layoutCache = null;
 
   const spreadsheetImport = {
     fileName: '',
@@ -101,7 +104,7 @@
 
   function loadState() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY) || localStorage.getItem(FALLBACK_STORAGE_KEY);
       if (!raw) return;
       const saved = JSON.parse(raw);
       if (!saved || !Array.isArray(saved.labels)) return;
@@ -112,6 +115,10 @@
     } catch (_) {
       // Abaikan data lokal yang rusak.
     }
+  }
+
+  function invalidateLayoutCache() {
+    layoutCache = null;
   }
 
   function saveState() {
@@ -171,6 +178,7 @@
   }
 
   function renderForms(openIndex = 0) {
+    invalidateLayoutCache();
     els.forms.innerHTML = state.labels.map((_, index) => createLabelCard(index, openIndex)).join('');
     els.labelCountPill.textContent = `${state.labels.length} label`;
     els.edgeMargin.value = String(state.margin);
@@ -178,7 +186,7 @@
     updateLayoutSummary();
   }
 
-  function getStyleProfile() {
+  function getStyleProfile(variant = 'base') {
     if (state.size === 'large') {
       return {
         pad: 4, logoW: 20, logoY: 3, numberBoxW: 39.5, numberBoxH: 12.5, numberY: 3,
@@ -203,15 +211,27 @@
         subjectLabelFont: 2.75, subjectFont: 2.7, subjectMinFont: 1.75, subjectMaxLines: 4
       };
     }
+    if (variant === 'tight') {
+      return {
+        pad: 2.5, logoW: 13.4, logoY: 2.0, numberBoxW: 35.6, numberBoxH: 10.4, numberY: 2.05,
+        senderY: 14.2, senderFont: 2.02, senderSubFont: 1.8, senderLineHeight: 2.4,
+        dividerY: 22.0, recipientGapTop: 1.65, recipientGapBottom: 1.35,
+        iconR: 3.05, iconGap: 1.55, headingFont: 2.28, recipientFont: 2.86,
+        recipientMinFont: 1.95, addressFont: 2.28, addressMinFont: 1.62,
+        recipientMaxLines: 4, addressMaxLines: 4,
+        docSize: 4.9, subjectPadTop: 1.35, subjectPadBottom: 1.35,
+        subjectLabelFont: 2.1, subjectFont: 2.08, subjectMinFont: 1.45, subjectMaxLines: 4
+      };
+    }
     return {
-      pad: 3, logoW: 15, logoY: 2.4, numberBoxW: 37, numberBoxH: 11.5, numberY: 2.3,
-      senderY: 16.2, senderFont: 2.35, senderSubFont: 2.08, senderLineHeight: 2.85,
-      dividerY: 25.3, recipientGapTop: 2.2, recipientGapBottom: 1.9,
-      iconR: 3.45, iconGap: 1.9, headingFont: 2.65, recipientFont: 3.25,
-      recipientMinFont: 2.15, addressFont: 2.65, addressMinFont: 1.85,
+      pad: 2.8, logoW: 14.4, logoY: 2.25, numberBoxW: 36.6, numberBoxH: 11.0, numberY: 2.15,
+      senderY: 15.1, senderFont: 2.18, senderSubFont: 1.95, senderLineHeight: 2.6,
+      dividerY: 23.7, recipientGapTop: 1.95, recipientGapBottom: 1.65,
+      iconR: 3.25, iconGap: 1.72, headingFont: 2.45, recipientFont: 3.0,
+      recipientMinFont: 2.05, addressFont: 2.42, addressMinFont: 1.72,
       recipientMaxLines: 4, addressMaxLines: 4,
-      docSize: 5.5, subjectPadTop: 1.85, subjectPadBottom: 1.85,
-      subjectLabelFont: 2.5, subjectFont: 2.45, subjectMinFont: 1.65, subjectMaxLines: 4
+      docSize: 5.15, subjectPadTop: 1.55, subjectPadBottom: 1.55,
+      subjectLabelFont: 2.25, subjectFont: 2.22, subjectMinFont: 1.55, subjectMaxLines: 4
     };
   }
 
@@ -227,8 +247,8 @@
     );
   }
 
-  function computeLabelMetrics(data, widthMm) {
-    const profile = getStyleProfile();
+  function computeLabelMetrics(data, widthMm, variant = 'base') {
+    const profile = getStyleProfile(variant);
     const contentWidth = widthMm - profile.pad * 2;
     const recipientTextWidth = contentWidth - profile.iconR * 2 - profile.iconGap;
     const recipient = measureFit(data.kepada, recipientTextWidth, profile.recipientMaxLines, profile.recipientFont, profile.recipientMinFont, 820);
@@ -268,23 +288,25 @@
     };
   }
 
-  function getLayoutInfo() {
-    const gap = 1.2;
+  function buildLayoutInfo(options = {}) {
+    const gap = options.gap ?? (state.size === 'compact' ? .9 : 1.2);
     const margin = state.margin;
     const width = (A4.widthMm - margin * 2 - gap) / 2;
     const pages = [[]];
+    const pageStats = [{ lastBottom: margin, rowCount: 0 }];
     const allItems = [];
     let pageIndex = 0;
     let y = margin;
 
     for (let index = 0; index < state.labels.length; index += 2) {
-      const firstMetrics = computeLabelMetrics(state.labels[index], width);
-      const secondMetrics = index + 1 < state.labels.length ? computeLabelMetrics(state.labels[index + 1], width) : null;
+      const firstMetrics = computeLabelMetrics(state.labels[index], width, options.profileVariant || 'base');
+      const secondMetrics = index + 1 < state.labels.length ? computeLabelMetrics(state.labels[index + 1], width, options.profileVariant || 'base') : null;
       const rowHeight = Math.max(firstMetrics.height, secondMetrics?.height || 0);
 
-      if (pages[pageIndex].length && y + rowHeight > A4.heightMm - margin) {
+      if (pages[pageIndex].length && y + rowHeight > A4.heightMm - margin + .01) {
         pageIndex += 1;
         pages.push([]);
+        pageStats.push({ lastBottom: margin, rowCount: 0 });
         y = margin;
       }
 
@@ -297,17 +319,53 @@
         pages[pageIndex].push(second);
         allItems.push({ ...second, pageIndex });
       }
+
+      pageStats[pageIndex].lastBottom = y + rowHeight;
+      pageStats[pageIndex].rowCount += 1;
       y += rowHeight + gap;
     }
 
-    return { gap, margin, width, pages, allItems };
+    const pageUnused = pageStats.map(stat => Math.max(0, A4.heightMm - margin - stat.lastBottom));
+    const firstPageCount = pages[0]?.length || 0;
+    const totalUnused = pageUnused.reduce((sum, value) => sum + value, 0);
+    return {
+      gap, margin, width, pages, allItems, pageStats, pageUnused, totalUnused,
+      firstPageCount,
+      profileVariant: options.profileVariant || 'base',
+      densityMode: options.densityMode || 'normal'
+    };
+  }
+
+  function compareLayoutPriority(a, b) {
+    if (a.pages.length !== b.pages.length) return a.pages.length - b.pages.length;
+    if (a.firstPageCount !== b.firstPageCount) return b.firstPageCount - a.firstPageCount;
+    if (Math.abs(a.totalUnused - b.totalUnused) > .01) return a.totalUnused - b.totalUnused;
+    return a.gap - b.gap;
+  }
+
+  function getLayoutInfo() {
+    if (layoutCache) return layoutCache;
+
+    const candidates = [
+      buildLayoutInfo({ profileVariant: 'base', densityMode: 'normal' })
+    ];
+
+    if (state.size === 'compact') {
+      candidates.push(buildLayoutInfo({ profileVariant: 'tight', gap: .55, densityMode: 'tight' }));
+    }
+
+    candidates.sort(compareLayoutPriority);
+    layoutCache = candidates[0];
+    return layoutCache;
   }
 
   function findPageForLabel(index) {
+    invalidateLayoutCache();
     return getLayoutInfo().allItems.find(item => item.index === index)?.pageIndex || 0;
   }
 
   function getPageCount() {
+    invalidateLayoutCache();
     return Math.max(1, getLayoutInfo().pages.length);
   }
 
@@ -320,8 +378,9 @@
       ? `${minHeight.toFixed(1)} mm`
       : `${minHeight.toFixed(1)}–${maxHeight.toFixed(1)} mm`;
     const firstPageCount = layout.pages[0]?.length || 0;
-    els.layoutSummary.textContent = `${SIZE_CONFIG[state.size].name}: lebar tetap ${layout.width.toFixed(1)} mm · tinggi adaptif ${heightText} · ${firstPageCount} label di halaman pertama · ${layout.pages.length} halaman PDF.`;
-    els.previewScalePill.textContent = `${layout.width.toFixed(1)} mm · tinggi adaptif`;
+    const densityText = layout.densityMode === 'tight' ? ' · padat otomatis aktif' : '';
+    els.layoutSummary.textContent = `${SIZE_CONFIG[state.size].name}: lebar tetap ${layout.width.toFixed(1)} mm · tinggi adaptif ${heightText} · ${firstPageCount} label di halaman pertama · ${layout.pages.length} halaman PDF${densityText}.`;
+    els.previewScalePill.textContent = `${layout.width.toFixed(1)} mm · ${layout.densityMode === 'tight' ? 'padat otomatis' : 'tinggi adaptif'}`;
   }
 
   function roundRect(ctx, x, y, w, h, r) {
@@ -1435,7 +1494,7 @@
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
       try {
-        const registration = await navigator.serviceWorker.register('sw.js?v=7.1', { updateViaCache: 'none' });
+        const registration = await navigator.serviceWorker.register('sw.js?v=7.2', { updateViaCache: 'none' });
         await registration.update();
       } catch (error) {
         console.warn('Service worker tidak dapat diperbarui.', error);
