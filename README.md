@@ -67,3 +67,9 @@ Footer bergaya konsisten dengan lacak.posnew.com. Tautan **PosNew Hub** mengarah
 - Menambahkan pembaca XLSX mandiri di browser tanpa mengubah format label dan tanpa library backend.
 - Menambahkan impor CSV dengan deteksi pemisah koma, titik koma, atau tab.
 - Menambahkan pemetaan kolom fleksibel, pratinjau data, deteksi sheet/header, dan teks tetap untuk field yang tidak tersedia di Excel.
+
+### Hotfix cache v7.1
+
+- Service worker memakai strategi network-first untuk HTML, JavaScript, dan CSS.
+- Cache versi lama otomatis dihapus dan tab lama diarahkan satu kali ke versi terbaru.
+- Asset utama memakai query versi agar perubahan dukungan XLSX/CSV langsung terbaca setelah deploy.
