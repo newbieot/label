@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Generator Label Surat PDF A4 | PosIND KCU Batam</title>
-  <meta name="description" content="Buat label surat PosIND KCU Batam dalam jumlah berapa pun, ambil data otomatis dari surat penawaran DOCX/PDF, lalu unduh PDF A4 yang rapi, ringkas, dan hemat kertas.">
+  <title>Generator Label Surat & Excel PDF A4 | PosIND KCU Batam</title>
+  <meta name="description" content="Buat label surat PosIND KCU Batam dari Excel, DOCX, PDF, atau TXT. Sesuaikan kolom Excel secara fleksibel lalu unduh PDF A4 yang rapi, ringkas, dan hemat kertas.">
   <meta name="keywords" content="generator label surat, label pengiriman PDF, label Pos Indonesia Batam, cetak label A4, label surat dinas, PosIND KCU Batam">
   <meta name="author" content="PosIND KCU Batam 29400">
   <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
@@ -41,7 +41,7 @@
     "offers": {"@type": "Offer", "price": "0", "priceCurrency": "IDR"},
     "featureList": [
       "Jumlah label tidak dibatasi",
-      "Impor data dari DOCX, PDF teks, dan TXT",
+      "Impor fleksibel dari Excel, CSV, DOCX, PDF teks, dan TXT",
       "Tinggi label adaptif",
       "Ekspor PDF A4 multi-halaman",
       "Pemrosesan data di browser"
@@ -71,7 +71,7 @@
       <div class="hero-copy-wrap">
         <p class="eyebrow">LABEL SURAT · PDF A4</p>
         <h1 id="hero-title">Buat label lebih cepat, tanpa membuang ruang kertas.</h1>
-        <p class="hero-copy">Unggah surat penawaran agar nomor surat, penerima, alamat, dan perihal terisi otomatis. Tambahkan label sebanyak yang diperlukan; lebarnya tetap konsisten, sedangkan tingginya menyesuaikan isi dan akan dilanjutkan ke halaman berikutnya.</p>
+        <p class="hero-copy">Unggah Excel atau surat penawaran agar nomor surat, penerima, alamat, dan perihal terisi otomatis. Tambahkan label sebanyak yang diperlukan; lebarnya tetap konsisten, sedangkan tingginya menyesuaikan isi dan akan dilanjutkan ke halaman berikutnya.</p>
       </div>
       <div class="hero-stats" aria-label="Ringkasan fitur">
         <div><strong>∞</strong><span>Jumlah label</span></div>
@@ -94,16 +94,84 @@
           <div class="import-heading">
             <span class="import-icon" aria-hidden="true">⇧</span>
             <div>
-              <h3 id="import-title">Ambil data dari surat penawaran</h3>
-              <p>Unggah satu atau beberapa surat. Setiap file akan menjadi satu label dan tetap dapat diperiksa sebelum diunduh.</p>
+              <h3 id="import-title">Ambil data dari Excel atau surat</h3>
+              <p>Excel dapat disesuaikan kolomnya sebelum diimpor. DOCX, PDF, dan TXT tetap dibaca otomatis seperti sebelumnya.</p>
             </div>
           </div>
           <label class="drop-zone" id="dropZone" for="letterFile">
-            <input id="letterFile" type="file" accept=".docx,.pdf,.txt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple>
+            <input id="letterFile" type="file" accept=".xlsx,.csv,.docx,.pdf,.txt,text/csv,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple>
             <span class="drop-main">Pilih file atau tarik ke sini</span>
-            <span class="drop-sub">DOCX, PDF berbasis teks, atau TXT · dapat memilih banyak file</span>
+            <span class="drop-sub">XLSX/CSV dengan pemetaan kolom · DOCX/PDF/TXT otomatis</span>
           </label>
           <div class="import-status" id="importStatus" aria-live="polite"></div>
+
+          <section class="spreadsheet-mapper" id="spreadsheetMapper" aria-labelledby="mapperTitle" hidden>
+            <div class="mapper-heading">
+              <div>
+                <p class="mapper-kicker">PENYESUAIAN EXCEL</p>
+                <h4 id="mapperTitle">Cocokkan kolom dengan label</h4>
+                <p id="mapperMeta">Pilih kolom yang berisi data untuk setiap bagian label.</p>
+              </div>
+              <button class="mapper-close" id="closeMapperBtn" type="button">Batalkan</button>
+            </div>
+
+            <div class="mapper-source-grid">
+              <div class="mapper-field">
+                <label for="sheetSelect">Sheet yang dibaca</label>
+                <select id="sheetSelect"></select>
+              </div>
+              <div class="mapper-field">
+                <label for="headerRowInput">Baris judul kolom</label>
+                <input id="headerRowInput" type="number" min="1" max="100" value="1" inputmode="numeric">
+              </div>
+            </div>
+
+            <div class="mapping-table" aria-label="Pemetaan kolom Excel">
+              <div class="mapping-row" data-map-row="noSurat">
+                <strong>Nomor surat</strong>
+                <label class="mapping-control"><span>Kolom utama</span><select data-map-primary="noSurat" aria-label="Kolom utama nomor surat"></select></label>
+                <label class="mapping-control"><span>Kolom tambahan</span><select data-map-secondary="noSurat" aria-label="Kolom tambahan nomor surat"></select></label>
+                <label class="mapping-control mapping-fixed"><span>Teks tetap/cadangan</span><input data-map-fixed="noSurat" aria-label="Teks tetap nomor surat" placeholder="Opsional"></label>
+              </div>
+              <div class="mapping-row" data-map-row="kepada">
+                <strong>Kepada siapa</strong>
+                <label class="mapping-control"><span>Kolom utama</span><select data-map-primary="kepada" aria-label="Kolom utama kepada siapa"></select></label>
+                <label class="mapping-control"><span>Kolom tambahan</span><select data-map-secondary="kepada" aria-label="Kolom tambahan kepada siapa"></select></label>
+                <label class="mapping-control mapping-fixed"><span>Teks tetap/cadangan</span><input data-map-fixed="kepada" aria-label="Teks tetap kepada siapa" placeholder="Dipakai bila kolom kosong"></label>
+              </div>
+              <div class="mapping-row" data-map-row="alamat">
+                <strong>Alamat penerima</strong>
+                <label class="mapping-control"><span>Kolom utama</span><select data-map-primary="alamat" aria-label="Kolom utama alamat penerima"></select></label>
+                <label class="mapping-control"><span>Kolom tambahan</span><select data-map-secondary="alamat" aria-label="Kolom tambahan alamat penerima"></select></label>
+                <label class="mapping-control mapping-fixed"><span>Teks tetap/cadangan</span><input data-map-fixed="alamat" aria-label="Teks tetap alamat penerima" placeholder="Dipakai bila kolom kosong"></label>
+              </div>
+              <div class="mapping-row" data-map-row="perihal">
+                <strong>Perihal</strong>
+                <label class="mapping-control"><span>Kolom utama</span><select data-map-primary="perihal" aria-label="Kolom utama perihal"></select></label>
+                <label class="mapping-control"><span>Kolom tambahan</span><select data-map-secondary="perihal" aria-label="Kolom tambahan perihal"></select></label>
+                <label class="mapping-control mapping-fixed"><span>Teks tetap/cadangan</span><input data-map-fixed="perihal" aria-label="Teks tetap perihal" placeholder="Contoh: Surat Penawaran"></label>
+              </div>
+            </div>
+            <p class="mapper-note">Kolom tambahan digabung di baris berikutnya untuk penerima/alamat, dan dipisahkan spasi untuk nomor surat/perihal. Baris kosong otomatis dilewati.</p>
+
+            <div class="mapper-preview">
+              <div class="mapper-preview-heading">
+                <strong>Pratinjau hasil</strong>
+                <span id="mapperCount">0 baris siap diimpor</span>
+              </div>
+              <div class="mapper-preview-scroll">
+                <table>
+                  <thead><tr><th>No. Surat</th><th>Kepada</th><th>Alamat</th><th>Perihal</th></tr></thead>
+                  <tbody id="mapperPreviewBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="mapper-actions">
+              <button class="secondary-button mapper-button" id="redetectBtn" type="button">Deteksi ulang</button>
+              <button class="primary-button mapper-button" id="importSpreadsheetBtn" type="button">Impor label</button>
+            </div>
+          </section>
         </section>
 
         <div class="list-heading">
@@ -181,7 +249,7 @@
         <p>Aplikasi ini membuat label pada kanvas A4 210 × 297 mm dengan posisi dimulai dari sudut kiri atas. Satu label tidak melebar memenuhi kertas. Tingginya menyesuaikan panjang alamat dan perihal sehingga ruang kosong tidak berlebihan.</p>
       </article>
       <div class="feature-grid">
-        <article><span class="feature-number">01</span><h3>Impor otomatis</h3><p>Ambil nomor surat, penerima, alamat, dan perihal dari DOCX, PDF berbasis teks, atau TXT.</p></article>
+        <article><span class="feature-number">01</span><h3>Impor otomatis</h3><p>Cocokkan kolom Excel/CSV atau ambil otomatis nomor surat, penerima, alamat, dan perihal dari DOCX, PDF berbasis teks, atau TXT.</p></article>
         <article><span class="feature-number">02</span><h3>Tanpa batas label</h3><p>Tambahkan label sebanyak yang diperlukan. PDF otomatis membuat halaman A4 baru.</p></article>
         <article><span class="feature-number">03</span><h3>Tinggi adaptif</h3><p>Pilihan ringkas, standar, dan besar mengatur skala huruf. Tinggi label dihitung otomatis sesuai isi agar lebih padat dan mudah dibaca.</p></article>
       </div>
@@ -190,7 +258,7 @@
         <h2 id="faq-title">Pertanyaan umum</h2>
         <details><summary>Apakah satu label akan memenuhi lebar kertas?</summary><p>Tidak. Lebar label tetap sekitar setengah A4 dan ditempatkan di sudut kiri atas. Tingginya menyesuaikan isi agar sisa kertas tetap luas.</p></details>
         <details><summary>Berapa jumlah label maksimal?</summary><p>Tidak ada batas jumlah dari aplikasi. Label akan diteruskan ke halaman PDF berikutnya sesuai kapasitas tata letak.</p></details>
-        <details><summary>Apakah hasil unggahan selalu akurat?</summary><p>Aplikasi membaca pola umum surat dinas. Data hasil ekstraksi ditampilkan kembali pada formulir sehingga pengguna dapat memeriksanya sebelum membuat PDF.</p></details>
+        <details><summary>Apakah nama kolom Excel harus sama?</summary><p>Tidak. Aplikasi mencoba mendeteksi kolom secara otomatis, lalu Anda dapat memilih kolom utama, kolom tambahan, atau teks tetap untuk setiap bagian label sebelum mengimpor.</p></details>
         <details><summary>Apakah PDF benar-benar tanpa margin?</summary><p>Dokumen PDF dibuat dari tepi halaman. Kemampuan mencetak hingga tepi fisik kertas tetap mengikuti dukungan borderless pada printer.</p></details>
       </div>
     </section>

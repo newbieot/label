@@ -6,6 +6,15 @@
   const LEGACY_STORAGE_KEY = 'label-posind-kcu-batam-v2';
   const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
   const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+  const SPREADSHEET_EXTENSIONS = ['.xlsx', '.csv'];
+  const HEADER_ALIASES = {
+    noSurat: ['no surat', 'nomor surat', 'no. surat', 'nosurat', 'letter number', 'nomor dokumen', 'no dokumen'],
+    kepada: ['tujuan surat jabatan pimpinan', 'tujuan surat', 'jabatan pimpinan', 'kepada', 'penerima', 'nama penerima', 'recipient', 'calon client', 'calon klien', 'nama perusahaan', 'nama instansi', 'instansi', 'client'],
+    kepadaTambahan: ['unit pic lanjutan', 'unit pic', 'pic lanjutan', 'cq', 'c.q', 'up', 'u.p', 'bagian tujuan', 'unit tujuan'],
+    alamat: ['alamat', 'alamat lengkap', 'alamat penerima', 'address', 'lokasi'],
+    alamatTambahan: ['kota', 'kabupaten', 'city', 'provinsi', 'kode pos'],
+    perihal: ['perihal', 'hal', 'subject', 'judul surat', 'keperluan', 'jenis surat', 'keterangan']
+  };
   const SIZE_CONFIG = {
     compact: { minHeight: 49, maxHeight: 78, name: 'Ringkas' },
     standard: { minHeight: 68, maxHeight: 105, name: 'Standar' },
@@ -26,6 +35,15 @@
     labels: [{ ...EMPTY_LABEL }]
   };
 
+  const spreadsheetImport = {
+    fileName: '',
+    workbook: null,
+    sheetName: '',
+    headerRow: 0,
+    headers: [],
+    rows: []
+  };
+
   const els = {
     forms: document.getElementById('labelForms'),
     canvas: document.getElementById('previewCanvas'),
@@ -44,6 +62,16 @@
     fileInput: document.getElementById('letterFile'),
     dropZone: document.getElementById('dropZone'),
     importStatus: document.getElementById('importStatus'),
+    spreadsheetMapper: document.getElementById('spreadsheetMapper'),
+    mapperTitle: document.getElementById('mapperTitle'),
+    mapperMeta: document.getElementById('mapperMeta'),
+    sheetSelect: document.getElementById('sheetSelect'),
+    headerRowInput: document.getElementById('headerRowInput'),
+    mapperCount: document.getElementById('mapperCount'),
+    mapperPreviewBody: document.getElementById('mapperPreviewBody'),
+    closeMapperBtn: document.getElementById('closeMapperBtn'),
+    redetectBtn: document.getElementById('redetectBtn'),
+    importSpreadsheetBtn: document.getElementById('importSpreadsheetBtn'),
     toast: document.getElementById('toast')
   };
 
@@ -674,37 +702,62 @@
     return -1;
   }
 
-  async function extractZipEntry(arrayBuffer, targetName) {
+  function normalizeZipPath(path) {
+    const parts = [];
+    String(path || '').replace(/^\/+/, '').split('/').forEach(part => {
+      if (!part || part === '.') return;
+      if (part === '..') parts.pop();
+      else parts.push(part);
+    });
+    return parts.join('/');
+  }
+
+  function resolveZipPath(baseFile, target) {
+    if (String(target || '').startsWith('/')) return normalizeZipPath(target);
+    const base = String(baseFile || '').split('/').slice(0, -1).join('/');
+    return normalizeZipPath(`${base}/${target || ''}`);
+  }
+
+  function readZipDirectory(arrayBuffer) {
     const view = new DataView(arrayBuffer);
     const eocd = findEocd(view);
-    if (eocd < 0) throw new Error('Struktur DOCX tidak dikenali.');
+    if (eocd < 0) throw new Error('Struktur file ZIP tidak dikenali.');
     const entries = view.getUint16(eocd + 10, true);
     let offset = view.getUint32(eocd + 16, true);
     const decoder = new TextDecoder('utf-8');
+    const directory = new Map();
 
     for (let index = 0; index < entries; index++) {
-      if (view.getUint32(offset, true) !== 0x02014b50) break;
+      if (offset + 46 > view.byteLength || view.getUint32(offset, true) !== 0x02014b50) break;
       const compression = view.getUint16(offset + 10, true);
       const compressedSize = view.getUint32(offset + 20, true);
+      const uncompressedSize = view.getUint32(offset + 24, true);
       const nameLength = view.getUint16(offset + 28, true);
       const extraLength = view.getUint16(offset + 30, true);
       const commentLength = view.getUint16(offset + 32, true);
       const localOffset = view.getUint32(offset + 42, true);
-      const name = decoder.decode(new Uint8Array(arrayBuffer, offset + 46, nameLength));
-      if (name === targetName) {
-        if (view.getUint32(localOffset, true) !== 0x04034b50) throw new Error('Data DOCX tidak valid.');
-        const localNameLength = view.getUint16(localOffset + 26, true);
-        const localExtraLength = view.getUint16(localOffset + 28, true);
-        const dataStart = localOffset + 30 + localNameLength + localExtraLength;
-        const compressed = new Uint8Array(arrayBuffer, dataStart, compressedSize);
-        if (compression === 0) return compressed.slice();
-        if (compression !== 8 || !('DecompressionStream' in window)) throw new Error('Browser belum mendukung pembacaan DOCX ini.');
-        const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-        return new Uint8Array(await new Response(stream).arrayBuffer());
-      }
+      const name = normalizeZipPath(decoder.decode(new Uint8Array(arrayBuffer, offset + 46, nameLength)));
+      directory.set(name, { compression, compressedSize, uncompressedSize, localOffset });
       offset += 46 + nameLength + extraLength + commentLength;
     }
-    throw new Error('Isi utama surat tidak ditemukan dalam DOCX.');
+    return directory;
+  }
+
+  async function extractZipEntry(arrayBuffer, targetName, directory = null) {
+    const entries = directory || readZipDirectory(arrayBuffer);
+    const entry = entries.get(normalizeZipPath(targetName));
+    if (!entry) throw new Error(`Isi ${targetName} tidak ditemukan.`);
+    const view = new DataView(arrayBuffer);
+    const { compression, compressedSize, localOffset } = entry;
+    if (localOffset + 30 > view.byteLength || view.getUint32(localOffset, true) !== 0x04034b50) throw new Error('Data ZIP tidak valid.');
+    const localNameLength = view.getUint16(localOffset + 26, true);
+    const localExtraLength = view.getUint16(localOffset + 28, true);
+    const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+    const compressed = new Uint8Array(arrayBuffer, dataStart, compressedSize);
+    if (compression === 0) return compressed.slice();
+    if (compression !== 8 || !('DecompressionStream' in window)) throw new Error('Browser belum mendukung pembacaan file terkompresi ini.');
+    const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
   }
 
   function documentXmlToText(xmlText) {
@@ -757,6 +810,374 @@
       output.push(lines.map(line => line.parts.sort((a,b) => a.x - b.x).map(part => part.text).join(' ')).join('\n'));
     }
     return output.join('\n');
+  }
+
+  function xmlText(bytes) {
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  function parseXml(bytes, errorMessage) {
+    const xml = new DOMParser().parseFromString(xmlText(bytes), 'application/xml');
+    if (xml.getElementsByTagName('parsererror').length) throw new Error(errorMessage);
+    return xml;
+  }
+
+  function getDescendantText(node, localName = 't') {
+    return Array.from(node?.getElementsByTagNameNS('*', localName) || []).map(item => item.textContent || '').join('');
+  }
+
+  function columnIndexFromReference(reference) {
+    const match = String(reference || '').match(/^([A-Z]+)/i);
+    if (!match) return -1;
+    return match[1].toUpperCase().split('').reduce((value, char) => value * 26 + char.charCodeAt(0) - 64, 0) - 1;
+  }
+
+  function columnName(index) {
+    let value = Number(index) + 1;
+    let output = '';
+    while (value > 0) {
+      const remainder = (value - 1) % 26;
+      output = String.fromCharCode(65 + remainder) + output;
+      value = Math.floor((value - 1) / 26);
+    }
+    return output || 'A';
+  }
+
+  function parseWorksheetRows(xml, sharedStrings) {
+    const output = [];
+    const rowNodes = Array.from(xml.getElementsByTagNameNS('*', 'row'));
+    let sequentialRow = 0;
+    for (const rowNode of rowNodes) {
+      const rowIndex = Math.max(0, Number(rowNode.getAttribute('r') || sequentialRow + 1) - 1);
+      const row = [];
+      let sequentialColumn = 0;
+      const cells = Array.from(rowNode.getElementsByTagNameNS('*', 'c'));
+      for (const cell of cells) {
+        const referencedColumn = columnIndexFromReference(cell.getAttribute('r'));
+        const columnIndex = referencedColumn >= 0 ? referencedColumn : sequentialColumn;
+        sequentialColumn = columnIndex + 1;
+        const type = cell.getAttribute('t') || '';
+        const valueNode = cell.getElementsByTagNameNS('*', 'v')[0];
+        const raw = valueNode?.textContent || '';
+        let value = '';
+        if (type === 's') value = sharedStrings[Number(raw)] ?? '';
+        else if (type === 'inlineStr') value = getDescendantText(cell, 't');
+        else if (type === 'b') value = raw === '1' ? 'TRUE' : 'FALSE';
+        else if (type === 'str' || type === 'd') value = raw;
+        else if (type === 'e') value = '';
+        else value = raw;
+        row[columnIndex] = cleanLine(value);
+      }
+      output[rowIndex] = row;
+      sequentialRow = rowIndex + 1;
+    }
+    for (let index = 0; index < output.length; index++) if (!output[index]) output[index] = [];
+    return output;
+  }
+
+  async function parseXlsxWorkbook(file) {
+    const buffer = await file.arrayBuffer();
+    const directory = readZipDirectory(buffer);
+    const workbookPath = 'xl/workbook.xml';
+    const relationshipsPath = 'xl/_rels/workbook.xml.rels';
+    const workbookXml = parseXml(await extractZipEntry(buffer, workbookPath, directory), 'Struktur workbook Excel tidak dapat dibaca.');
+    const relationshipsXml = parseXml(await extractZipEntry(buffer, relationshipsPath, directory), 'Relasi workbook Excel tidak dapat dibaca.');
+    const relationships = new Map(Array.from(relationshipsXml.getElementsByTagNameNS('*', 'Relationship')).map(node => [
+      node.getAttribute('Id'),
+      resolveZipPath(workbookPath, node.getAttribute('Target'))
+    ]));
+
+    let sharedStrings = [];
+    if (directory.has('xl/sharedStrings.xml')) {
+      const sharedXml = parseXml(await extractZipEntry(buffer, 'xl/sharedStrings.xml', directory), 'Teks bersama Excel tidak dapat dibaca.');
+      sharedStrings = Array.from(sharedXml.getElementsByTagNameNS('*', 'si')).map(node => getDescendantText(node, 't'));
+    }
+
+    const sheets = [];
+    const sheetNodes = Array.from(workbookXml.getElementsByTagNameNS('*', 'sheet'));
+    for (const sheetNode of sheetNodes) {
+      const relationId = sheetNode.getAttribute('r:id') || sheetNode.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+      const path = relationships.get(relationId);
+      if (!path || !directory.has(path)) continue;
+      const sheetXml = parseXml(await extractZipEntry(buffer, path, directory), `Sheet ${sheetNode.getAttribute('name') || ''} tidak dapat dibaca.`);
+      sheets.push({ name: sheetNode.getAttribute('name') || `Sheet ${sheets.length + 1}`, rows: parseWorksheetRows(sheetXml, sharedStrings) });
+    }
+    if (!sheets.length) throw new Error('Tidak ada sheet yang dapat dibaca dari file Excel.');
+    return { sheets };
+  }
+
+  function countDelimiter(line, delimiter) {
+    let count = 0;
+    let quoted = false;
+    for (let index = 0; index < line.length; index++) {
+      if (line[index] === '"') {
+        if (quoted && line[index + 1] === '"') index++;
+        else quoted = !quoted;
+      } else if (!quoted && line[index] === delimiter) count++;
+    }
+    return count;
+  }
+
+  function parseDelimitedRows(text) {
+    const cleaned = String(text || '').replace(/^\uFEFF/, '');
+    const sampleLines = cleaned.split(/\r?\n/).filter(Boolean).slice(0, 12);
+    const delimiters = [',', ';', '\t'];
+    const delimiter = delimiters.map(value => ({ value, score: sampleLines.reduce((sum, line) => sum + countDelimiter(line, value), 0) }))
+      .sort((a, b) => b.score - a.score)[0]?.value || ',';
+    const rows = [];
+    let row = [];
+    let cell = '';
+    let quoted = false;
+    for (let index = 0; index < cleaned.length; index++) {
+      const char = cleaned[index];
+      if (char === '"') {
+        if (quoted && cleaned[index + 1] === '"') { cell += '"'; index++; }
+        else quoted = !quoted;
+      } else if (!quoted && char === delimiter) {
+        row.push(cleanLine(cell)); cell = '';
+      } else if (!quoted && (char === '\n' || char === '\r')) {
+        if (char === '\r' && cleaned[index + 1] === '\n') index++;
+        row.push(cleanLine(cell));
+        if (row.some(value => normalizeText(value))) rows.push(row);
+        row = []; cell = '';
+      } else cell += char;
+    }
+    row.push(cleanLine(cell));
+    if (row.some(value => normalizeText(value))) rows.push(row);
+    return rows;
+  }
+
+  async function parseSpreadsheetFile(file) {
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.csv')) return { sheets: [{ name: 'CSV', rows: parseDelimitedRows(await file.text()) }] };
+    if (name.endsWith('.xlsx')) return parseXlsxWorkbook(file);
+    throw new Error('Format spreadsheet belum didukung. Gunakan XLSX atau CSV.');
+  }
+
+  function normalizedHeader(value) {
+    return normalizeText(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  function headerAliasScore(header, aliases) {
+    const normalized = normalizedHeader(header);
+    if (!normalized) return 0;
+    let best = 0;
+    aliases.forEach((alias, aliasIndex) => {
+      const candidate = normalizedHeader(alias);
+      const priority = Math.max(0, 20 - aliasIndex);
+      if (normalized === candidate) best = Math.max(best, 140 + priority);
+      else if (normalized.includes(candidate) || candidate.includes(normalized)) best = Math.max(best, 105 + priority);
+      else {
+        const words = candidate.split(' ').filter(Boolean);
+        if (words.length && words.every(word => normalized.includes(word))) best = Math.max(best, 78 + priority);
+      }
+    });
+    return best;
+  }
+
+  function headerRowScore(row) {
+    const values = (row || []).map(cleanLine).filter(Boolean);
+    if (!values.length) return -1;
+    const aliasGroups = Object.values(HEADER_ALIASES);
+    const aliasMatches = values.reduce((count, value) => count + (aliasGroups.some(aliases => headerAliasScore(value, aliases) >= 72) ? 1 : 0), 0);
+    const textValues = values.filter(value => /[a-z]/i.test(value)).length;
+    return aliasMatches * 35 + Math.min(values.length, 20) * 2 + textValues - Math.max(0, values.length - textValues) * .5;
+  }
+
+  function detectHeaderRow(rows) {
+    let bestIndex = 0;
+    let bestScore = -Infinity;
+    const limit = Math.min(40, rows.length);
+    for (let index = 0; index < limit; index++) {
+      const score = headerRowScore(rows[index]);
+      if (score > bestScore) { bestScore = score; bestIndex = index; }
+    }
+    return bestIndex;
+  }
+
+  function getUniqueHeaders(rows, headerRow) {
+    const sample = rows.slice(headerRow, Math.min(rows.length, headerRow + 30));
+    const width = Math.max(0, ...sample.map(row => row?.length || 0));
+    const used = new Map();
+    return Array.from({ length: width }, (_, index) => {
+      const base = cleanLine(rows[headerRow]?.[index]) || `Kolom ${columnName(index)}`;
+      const count = (used.get(base.toLowerCase()) || 0) + 1;
+      used.set(base.toLowerCase(), count);
+      return count === 1 ? base : `${base} (${count})`;
+    });
+  }
+
+  function findBestHeaderIndex(headers, aliases, excluded = []) {
+    let bestIndex = -1;
+    let bestScore = 0;
+    headers.forEach((header, index) => {
+      if (excluded.includes(index)) return;
+      const score = headerAliasScore(header, aliases);
+      if (score > bestScore) { bestScore = score; bestIndex = index; }
+    });
+    return bestIndex;
+  }
+
+  function autoDetectMapping(headers) {
+    const noSurat = findBestHeaderIndex(headers, HEADER_ALIASES.noSurat);
+    const kepada = findBestHeaderIndex(headers, HEADER_ALIASES.kepada, [noSurat]);
+    const kepadaTambahan = findBestHeaderIndex(headers, HEADER_ALIASES.kepadaTambahan, [noSurat, kepada]);
+    const alamat = findBestHeaderIndex(headers, HEADER_ALIASES.alamat, [noSurat, kepada, kepadaTambahan]);
+    const perihal = findBestHeaderIndex(headers, HEADER_ALIASES.perihal, [noSurat, kepada, kepadaTambahan, alamat]);
+    return {
+      noSurat: { primary: noSurat, secondary: -1 },
+      kepada: { primary: kepada, secondary: kepadaTambahan },
+      alamat: { primary: alamat, secondary: -1 },
+      perihal: { primary: perihal, secondary: -1 }
+    };
+  }
+
+  function mappingSelects(field) {
+    return {
+      primary: els.spreadsheetMapper.querySelector(`[data-map-primary="${field}"]`),
+      secondary: els.spreadsheetMapper.querySelector(`[data-map-secondary="${field}"]`),
+      fixed: els.spreadsheetMapper.querySelector(`[data-map-fixed="${field}"]`)
+    };
+  }
+
+  function setColumnOptions(select, headers, selectedIndex) {
+    select.innerHTML = `<option value="">Tidak digunakan</option>` + headers.map((header, index) => `<option value="${index}">${escapeHtml(columnName(index))} · ${escapeHtml(header)}</option>`).join('');
+    select.value = selectedIndex >= 0 ? String(selectedIndex) : '';
+  }
+
+  function populateMappingControls(autoMap = true) {
+    const detected = autoMap ? autoDetectMapping(spreadsheetImport.headers) : null;
+    ['noSurat', 'kepada', 'alamat', 'perihal'].forEach(field => {
+      const controls = mappingSelects(field);
+      const previousPrimary = controls.primary.value;
+      const previousSecondary = controls.secondary.value;
+      setColumnOptions(controls.primary, spreadsheetImport.headers, detected ? detected[field].primary : Number(previousPrimary));
+      setColumnOptions(controls.secondary, spreadsheetImport.headers, detected ? detected[field].secondary : Number(previousSecondary));
+    });
+    refreshSpreadsheetPreview();
+  }
+
+  function currentSpreadsheetSheet() {
+    return spreadsheetImport.workbook?.sheets.find(sheet => sheet.name === spreadsheetImport.sheetName) || null;
+  }
+
+  function setSpreadsheetSheet(sheetName, redetect = true) {
+    const sheet = spreadsheetImport.workbook?.sheets.find(item => item.name === sheetName) || spreadsheetImport.workbook?.sheets[0];
+    if (!sheet) return;
+    spreadsheetImport.sheetName = sheet.name;
+    spreadsheetImport.rows = sheet.rows;
+    spreadsheetImport.headerRow = redetect ? detectHeaderRow(sheet.rows) : Math.max(0, Number(els.headerRowInput.value || 1) - 1);
+    els.sheetSelect.value = sheet.name;
+    els.headerRowInput.max = String(Math.max(1, Math.min(500, sheet.rows.length || 1)));
+    els.headerRowInput.value = String(spreadsheetImport.headerRow + 1);
+    spreadsheetImport.headers = getUniqueHeaders(sheet.rows, spreadsheetImport.headerRow);
+    populateMappingControls(true);
+  }
+
+  function readMapping() {
+    const output = {};
+    ['noSurat', 'kepada', 'alamat', 'perihal'].forEach(field => {
+      const controls = mappingSelects(field);
+      output[field] = {
+        primary: controls.primary.value === '' ? -1 : Number(controls.primary.value),
+        secondary: controls.secondary.value === '' ? -1 : Number(controls.secondary.value),
+        fixed: normalizeText(controls.fixed.value)
+      };
+    });
+    return output;
+  }
+
+  function mappedSpreadsheetRecords() {
+    const mapping = readMapping();
+    const selectedColumns = [...new Set(Object.values(mapping).flatMap(item => [item.primary, item.secondary]).filter(index => index >= 0))];
+    if (!selectedColumns.length) return [];
+    const records = [];
+    const sourceRows = spreadsheetImport.rows.slice(spreadsheetImport.headerRow + 1);
+    for (const row of sourceRows) {
+      if (!selectedColumns.some(index => normalizeText(row?.[index]))) continue;
+      const label = { ...EMPTY_LABEL };
+      for (const field of ['noSurat', 'kepada', 'alamat', 'perihal']) {
+        const config = mapping[field];
+        const values = [];
+        if (config.primary >= 0) values.push(normalizeText(row?.[config.primary]));
+        if (config.secondary >= 0 && config.secondary !== config.primary) values.push(normalizeText(row?.[config.secondary]));
+        const joined = values.filter(Boolean).join(field === 'kepada' || field === 'alamat' ? '\n' : ' ');
+        label[field] = joined || config.fixed;
+      }
+      records.push(label);
+      if (records.length >= 10000) break;
+    }
+    return records;
+  }
+
+  function refreshSpreadsheetPreview() {
+    if (els.spreadsheetMapper.hidden) return;
+    const records = mappedSpreadsheetRecords();
+    const incomplete = records.filter(label => ['noSurat', 'kepada', 'alamat', 'perihal'].some(field => !normalizeText(label[field]))).length;
+    els.mapperCount.textContent = records.length
+      ? `${records.length} baris siap${incomplete ? ` · ${incomplete} perlu dilengkapi` : ''}`
+      : 'Belum ada baris yang dapat diimpor';
+    els.importSpreadsheetBtn.disabled = !records.length;
+    els.importSpreadsheetBtn.textContent = records.length ? `Impor ${records.length} label` : 'Impor label';
+    els.mapperPreviewBody.innerHTML = records.length
+      ? records.slice(0, 5).map(label => `<tr><td>${escapeHtml(label.noSurat || '—')}</td><td>${escapeHtml(label.kepada || '—')}</td><td>${escapeHtml(label.alamat || '—')}</td><td>${escapeHtml(label.perihal || '—')}</td></tr>`).join('')
+      : '<tr><td class="mapper-preview-empty" colspan="4">Pilih minimal satu kolom sumber untuk melihat pratinjau.</td></tr>';
+  }
+
+  function closeSpreadsheetMapper() {
+    els.spreadsheetMapper.hidden = true;
+    spreadsheetImport.fileName = '';
+    spreadsheetImport.workbook = null;
+    spreadsheetImport.sheetName = '';
+    spreadsheetImport.headers = [];
+    spreadsheetImport.rows = [];
+  }
+
+  async function prepareSpreadsheetImport(file) {
+    showImportStatus(`Membaca spreadsheet: ${file.name}…`);
+    els.fileInput.disabled = true;
+    try {
+      const workbook = await parseSpreadsheetFile(file);
+      spreadsheetImport.fileName = file.name;
+      spreadsheetImport.workbook = workbook;
+      els.sheetSelect.innerHTML = workbook.sheets.map(sheet => `<option value="${escapeHtml(sheet.name)}">${escapeHtml(sheet.name)}</option>`).join('');
+      const bestSheet = workbook.sheets.map(sheet => ({ sheet, score: headerRowScore(sheet.rows[detectHeaderRow(sheet.rows)]) + Math.min(sheet.rows.length, 100) / 10 }))
+        .sort((a, b) => b.score - a.score)[0]?.sheet || workbook.sheets[0];
+      els.spreadsheetMapper.hidden = false;
+      els.mapperTitle.textContent = `Cocokkan kolom · ${file.name}`;
+      els.mapperMeta.textContent = `${workbook.sheets.length} sheet ditemukan. Sistem sudah memilih kolom yang paling mungkin; Anda tetap dapat mengubahnya.`;
+      setSpreadsheetSheet(bestSheet.name, true);
+      showImportStatus(`${file.name} berhasil dibaca. Periksa pemetaan kolom, lalu tekan tombol impor.`);
+      requestAnimationFrame(() => els.spreadsheetMapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+    } catch (error) {
+      console.error(error);
+      closeSpreadsheetMapper();
+      showImportStatus(`${file.name}: ${error.message}`, true);
+    } finally {
+      els.fileInput.value = '';
+      els.fileInput.disabled = false;
+    }
+  }
+
+  function importSpreadsheetRecords() {
+    const records = mappedSpreadsheetRecords();
+    if (!records.length) {
+      showImportStatus('Belum ada baris yang dapat diimpor. Periksa pilihan kolom.', true);
+      return;
+    }
+    const replaceFirst = state.labels.length === 1 && isBlankLabel(state.labels[0]);
+    records.forEach((label, index) => {
+      if (replaceFirst && index === 0) state.labels[0] = label;
+      else state.labels.push(label);
+    });
+    state.previewPage = findPageForLabel(state.labels.length - 1);
+    renderForms(Math.max(0, state.labels.length - 1));
+    renderPreview();
+    saveState();
+    const fileName = spreadsheetImport.fileName;
+    closeSpreadsheetMapper();
+    showImportStatus(`${records.length} baris dari ${fileName} berhasil ditambahkan menjadi label.`);
+    showToast(`${records.length} label Excel berhasil diimpor.`);
   }
 
   function cleanLine(value) {
@@ -831,7 +1252,7 @@
     if (name.endsWith('.docx')) return extractDocxText(file);
     if (name.endsWith('.pdf')) return extractPdfText(file);
     if (name.endsWith('.txt')) return file.text();
-    throw new Error('Format file belum didukung. Gunakan DOCX, PDF, atau TXT.');
+    throw new Error('Format file belum didukung. Gunakan XLSX, CSV, DOCX, PDF, atau TXT.');
   }
 
   function showImportStatus(message, isError = false) {
@@ -843,6 +1264,12 @@
   async function importFiles(fileList) {
     const files = [...fileList];
     if (!files.length) return;
+    const spreadsheetFiles = files.filter(file => SPREADSHEET_EXTENSIONS.some(extension => file.name.toLowerCase().endsWith(extension)));
+    if (spreadsheetFiles.length) {
+      if (files.length > 1) showImportStatus('Untuk penyesuaian kolom, unggah satu file XLSX/CSV dalam satu proses. File pertama akan dibuka.');
+      await prepareSpreadsheetImport(spreadsheetFiles[0]);
+      return;
+    }
     showImportStatus(`Membaca ${files.length} file…`);
     els.fileInput.disabled = true;
     const parsed = [];
@@ -913,6 +1340,7 @@
     state.previewPage = 0;
     renderForms(0); renderPreview(); saveState();
     els.importStatus.classList.remove('show', 'error');
+    closeSpreadsheetMapper();
     showToast('Semua data dikosongkan.');
   }
 
@@ -963,6 +1391,32 @@
   els.prevPageBtn.addEventListener('click', () => { state.previewPage--; renderPreview(); });
   els.nextPageBtn.addEventListener('click', () => { state.previewPage++; renderPreview(); });
   els.fileInput.addEventListener('change', event => importFiles(event.target.files));
+  els.sheetSelect.addEventListener('change', event => setSpreadsheetSheet(event.target.value, true));
+  els.headerRowInput.addEventListener('change', () => {
+    const sheet = currentSpreadsheetSheet();
+    if (!sheet) return;
+    spreadsheetImport.headerRow = Math.max(0, Math.min(sheet.rows.length - 1, Number(els.headerRowInput.value || 1) - 1));
+    els.headerRowInput.value = String(spreadsheetImport.headerRow + 1);
+    spreadsheetImport.headers = getUniqueHeaders(sheet.rows, spreadsheetImport.headerRow);
+    populateMappingControls(true);
+  });
+  els.spreadsheetMapper.addEventListener('input', event => {
+    if (event.target.matches('[data-map-fixed]')) refreshSpreadsheetPreview();
+  });
+  els.spreadsheetMapper.addEventListener('change', event => {
+    if (event.target.matches('[data-map-primary], [data-map-secondary]')) refreshSpreadsheetPreview();
+  });
+  els.closeMapperBtn.addEventListener('click', () => { closeSpreadsheetMapper(); showImportStatus('Impor spreadsheet dibatalkan.'); });
+  els.redetectBtn.addEventListener('click', () => {
+    const sheet = currentSpreadsheetSheet();
+    if (!sheet) return;
+    spreadsheetImport.headerRow = detectHeaderRow(sheet.rows);
+    els.headerRowInput.value = String(spreadsheetImport.headerRow + 1);
+    spreadsheetImport.headers = getUniqueHeaders(sheet.rows, spreadsheetImport.headerRow);
+    populateMappingControls(true);
+    showToast('Judul dan kolom dideteksi ulang.');
+  });
+  els.importSpreadsheetBtn.addEventListener('click', importSpreadsheetRecords);
 
   ['dragenter','dragover'].forEach(type => els.dropZone.addEventListener(type, event => {
     event.preventDefault();

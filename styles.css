@@ -194,3 +194,48 @@ button { -webkit-tap-highlight-color: transparent; }
   .footer-creator-badge span { overflow: hidden; text-overflow: ellipsis; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; transition: none !important; } }
+
+/* Flexible Excel / CSV column mapper */
+.app-shell, .editor-panel, .spreadsheet-mapper, .mapper-source-grid, .mapping-table, .mapper-preview, .mapper-preview-scroll { min-width: 0; max-width: 100%; }
+.spreadsheet-mapper { width: 100%; margin-top: 14px; padding: 16px; overflow: hidden; border: 1px solid #cfd9e8; border-radius: 15px; background: #fff; box-shadow: 0 10px 28px rgba(20,43,99,.07); }
+.spreadsheet-mapper[hidden] { display: none !important; }
+.mapper-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.mapper-heading > div { min-width: 0; }
+.mapper-kicker { margin: 0 0 4px; color: var(--orange); font-size: .65rem; font-weight: 900; letter-spacing: .12em; }
+.mapper-heading h4 { margin: 0; color: var(--navy); font-size: 1rem; overflow-wrap: anywhere; }
+.mapper-heading p:not(.mapper-kicker) { margin: 4px 0 0; color: var(--muted); font-size: .73rem; overflow-wrap: anywhere; }
+.mapper-close { flex: 0 0 auto; border: 0; padding: 4px 0; color: #7a465d; background: transparent; font-size: .72rem; font-weight: 780; cursor: pointer; }
+.mapper-close:hover { color: #b42318; text-decoration: underline; }
+.mapper-source-grid { display: grid; grid-template-columns: 1fr 145px; gap: 10px; margin-top: 14px; }
+.mapper-field { display: grid; min-width: 0; }
+.mapper-field label { margin-bottom: 6px; color: #344054; font-size: .74rem; font-weight: 770; }
+.mapper-field select, .mapper-field input, .mapping-row select, .mapping-row input { width: 100%; min-width: 0; min-height: 39px; padding: 7px 9px; border: 1px solid #cfd7e4; border-radius: 9px; color: var(--ink); background: #fff; outline: none; font-size: .73rem; }
+.mapper-field select:focus, .mapper-field input:focus, .mapping-row select:focus, .mapping-row input:focus { border-color: var(--navy-2); box-shadow: 0 0 0 3px rgba(29,57,120,.10); }
+.mapping-table { display: grid; gap: 10px; margin-top: 14px; }
+.mapping-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: end; gap: 7px; padding: 10px; border: 1px solid #e5eaf1; border-radius: 11px; background: #fbfcfe; }
+.mapping-row > strong { grid-column: 1 / -1; margin-bottom: 1px; color: var(--navy); font-size: .75rem; line-height: 1.25; }
+.mapping-control { display: grid; min-width: 0; gap: 4px; }
+.mapping-control > span { color: #7b8698; font-size: .61rem; font-weight: 780; }
+.mapping-control.mapping-fixed { grid-column: 1 / -1; }
+.mapper-note { margin: 10px 1px 0; color: #7a8496; font-size: .66rem; }
+.mapper-preview { margin-top: 13px; overflow: hidden; border: 1px solid #dfe5ee; border-radius: 11px; background: #fbfcfe; }
+.mapper-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 10px; border-bottom: 1px solid #e3e8f0; }
+.mapper-preview-heading strong { color: var(--navy); font-size: .75rem; }
+.mapper-preview-heading span { color: #667085; font-size: .65rem; }
+.mapper-preview-scroll { width: 100%; max-height: 190px; overflow: auto; }
+.mapper-preview table { width: 100%; min-width: 650px; border-collapse: collapse; table-layout: fixed; }
+.mapper-preview th, .mapper-preview td { padding: 7px 8px; border-right: 1px solid #e9edf3; border-bottom: 1px solid #e9edf3; text-align: left; vertical-align: top; font-size: .64rem; line-height: 1.35; white-space: pre-line; overflow-wrap: anywhere; }
+.mapper-preview th { position: sticky; top: 0; z-index: 1; color: #46536a; background: #f0f4f9; font-weight: 820; }
+.mapper-preview th:last-child, .mapper-preview td:last-child { border-right: 0; }
+.mapper-preview tbody tr:last-child td { border-bottom: 0; }
+.mapper-preview-empty { color: #8a94a5; text-align: center !important; }
+.mapper-actions { display: grid; grid-template-columns: .8fr 1.2fr; gap: 9px; margin-top: 12px; }
+.mapper-button { min-height: 43px; font-size: .76rem; }
+html, body { overflow-x: hidden; }
+
+@media (max-width: 680px) {
+  .mapper-source-grid { grid-template-columns: 1fr; }
+  .mapping-row { grid-template-columns: 1fr; }
+  .mapping-row > strong, .mapping-control.mapping-fixed { grid-column: 1; }
+  .mapper-preview th { position: static; }
+}

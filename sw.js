@@ -1,4 +1,4 @@
-const CACHE = 'label-posind-v5-english-footer';
+const CACHE = 'label-posind-v6-excel-mapper';
 const ASSETS = ['/', '/index.html', '/styles.css', '/app.js', '/assets/logo-posind.png', '/assets/favicon.png'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))));
